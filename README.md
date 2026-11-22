@@ -22,9 +22,10 @@ Please open an issue with your console/firmware/game and what happened.
 
 ## Known limitations
 
-- **Text encoding:** only Western-European games (Windows-1252: English, German, French,
-  Spanish, …) display correctly. Japanese, Polish, Russian etc. may show broken characters
-  (ICU support not built yet).
+- **Text encoding:** since v0.2-test the build includes ICU, so Japanese (Shift-JIS), Polish
+  and other Central-European, Cyrillic, Greek, Korean and Chinese games should display
+  correctly — **not yet confirmed on hardware**. If a game shows garbled text, set its encoding
+  in the game's `RPG_RT.ini`: `[EasyRPG]` → `Encoding=1250` (Polish), `932` (Japanese), `1251` (Russian).
 - This is a **debug-flavoured build**: it shows PS4 notifications during startup and when an
   error happens. That's intentional while testing.
 - RPG Maker XP / VX / VX Ace / MV / MZ games are **not** supported (different engines).

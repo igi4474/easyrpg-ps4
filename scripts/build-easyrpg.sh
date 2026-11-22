@@ -18,10 +18,10 @@ git -C "$SRC/Player" checkout -q a99ca834b856
 git -C "$SRC/Player" apply --check "$HERE/patches/easyrpg-player-ps4.patch" 2>/dev/null \
   && git -C "$SRC/Player" apply "$HERE/patches/easyrpg-player-ps4.patch" || true
 
-echo ">>> liblcf (no ICU: only Windows-1252 text encoding for now)"
+echo ">>> liblcf (with ICU)"
 cd "$SRC/liblcf" && rm -rf build-ps4 && mkdir build-ps4 && cd build-ps4
 openorbis-cmake -G Ninja -DCMAKE_INSTALL_PREFIX="$P" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-  -DLIBLCF_WITH_ICU=OFF -DLIBLCF_ENABLE_TOOLS=OFF -DLIBLCF_ENABLE_TESTS=OFF -DLIBLCF_UPDATE_MIMEDB=OFF \
+  -DLIBLCF_WITH_ICU=ON -DLIBLCF_ENABLE_TOOLS=OFF -DLIBLCF_ENABLE_TESTS=OFF -DLIBLCF_UPDATE_MIMEDB=OFF \
   -DLIBLCF_ENABLE_INSTALL=ON .. > /dev/null
 ninja > /dev/null && ninja install > /dev/null
 
@@ -39,6 +39,6 @@ cp -r "$SRC/Player/resources/ps4/"* "$OUT/"
 cp eboot.bin "$OUT/"
 CID=IV0001-ERPG00001_00-EASYRPGPLAYER000
 python3 "$HERE/tools/make_sfo.py" "$OUT/sce_sys/param.sfo" --title "EasyRPG Player (test)" \
-  --title-id ERPG00001 --content-id "$CID" --version 01.02
+  --title-id ERPG00001 --content-id "$CID" --version 01.03
 (cd "$OUT" && "$OPENORBIS/bin/create-gp4" -out app.gp4 --content-id "$CID" --path .)
 echo "Done: $OUT  (copy it to Windows and run tools/build-pkg.bat next to it)"

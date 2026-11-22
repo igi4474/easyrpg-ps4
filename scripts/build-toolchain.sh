@@ -60,6 +60,20 @@ git apply --check "$HERE/patches/musl-ps4-pthread-types.patch" 2>/dev/null && gi
   CFLAGS="-fPIC -DPS4 -D_LIBUNWIND_IS_BAREMETAL=1 -DPS4_FLEXIBLE_MEMORY=1" > /dev/null
 make --quiet -j"$(nproc)" && make install > /dev/null
 
+echo ">>> sys/endian.h shim (FreeBSD header some libraries expect, e.g. ICU)"
+cat > "$OO/include/sys/endian.h" <<'EOF2'
+/* PS4 shim: FreeBSD-style <sys/endian.h> on top of musl's <endian.h> */
+#ifndef _PS4_SYS_ENDIAN_H
+#define _PS4_SYS_ENDIAN_H
+#include <endian.h>
+#ifndef _BYTE_ORDER
+#define _BYTE_ORDER __BYTE_ORDER
+#define _LITTLE_ENDIAN __LITTLE_ENDIAN
+#define _BIG_ENDIAN __BIG_ENDIAN
+#endif
+#endif
+EOF2
+
 echo ">>> system library stubs"
 rm -rf /tmp/libdoc && mkdir /tmp/libdoc
 find "$SRC/ps4libdoc" -name "*.json" -exec cp {} /tmp/libdoc/ \;

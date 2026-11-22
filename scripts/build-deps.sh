@@ -116,4 +116,25 @@ cd "$D/inih"
 $CC $CFLAGS -c ini.c -o ini.o && $AR rcs "$P/lib/libinih.a" ini.o && cp ini.h "$P/include/"
 printf "prefix=%s\nlibdir=\${prefix}/lib\nincludedir=\${prefix}/include\nName: inih\nDescription: inih\nVersion: 58\nCflags: -I\${includedir}\nLibs: -L\${libdir} -linih\n" "$P" > "$P/lib/pkgconfig/inih.pc"
 
+echo ">>> ICU 78.3 (text encodings: Shift-JIS, Windows-125x, GBK, Big5, EUC-KR ...)"
+if [ ! -d "$SRC/icu" ]; then
+  git clone -q --depth 1 --filter=blob:none --sparse -b release-78.3 https://github.com/unicode-org/icu "$SRC/icu"
+  git -C "$SRC/icu" sparse-checkout set icu4c/source
+fi
+ICUS="$SRC/icu/icu4c/source"
+chmod u+x "$ICUS/configure"
+cp "$ICUS/config/mh-linux" "$ICUS/config/mh-unknown"
+grep -q UCONFIG_ONLY_COLLATION "$ICUS/config/mh-unknown" || perl -pi -e 's/^LIBCPPFLAGS =/LIBCPPFLAGS = -DUCONFIG_ONLY_COLLATION/' "$ICUS/config/mh-unknown"
+perl -pi -e 's/SMALL_BUFFER_MAX_SIZE 512/SMALL_BUFFER_MAX_SIZE 2048/' "$ICUS/tools/toolutil/pkg_genc.h"
+export ICU_DATA_FILTER_FILE="$HERE/scripts/icu-filter.json"   # only converters (+aliases, normalization): ~5 MB
+ICU_ARGS=(--enable-static --disable-shared --enable-strict=no --disable-tests --disable-samples --disable-dyload
+          --disable-extras --disable-icuio --with-data-packaging=static --disable-layout --disable-layoutex --enable-draft=no)
+mkdir -p "$SRC/icu-native" && (cd "$SRC/icu-native" && \
+  env -u CFLAGS -u CXXFLAGS -u CPPFLAGS -u LDFLAGS -u LIBS CC=clang CXX=clang++ "$ICUS/configure" "${ICU_ARGS[@]}" > "$LOG/icu-native-cfg.log" && \
+  env -u CFLAGS -u CXXFLAGS -u CPPFLAGS -u LDFLAGS -u LIBS make -j"$(nproc)" > "$LOG/icu-native-build.log")
+mkdir -p "$SRC/icu-cross" && (cd "$SRC/icu-cross" && \
+  "$ICUS/configure" "${ICU_ARGS[@]}" --prefix="$P" --host=x86_64-none-elf --with-cross-build="$SRC/icu-native" --disable-tools > "$LOG/icu-cross-cfg.log" && \
+  make -j"$(nproc)" > "$LOG/icu-cross-build.log" && make install > "$LOG/icu-cross-install.log")
+unset ICU_DATA_FILTER_FILE
+
 echo "Dependencies ready in $P"

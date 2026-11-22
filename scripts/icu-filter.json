@@ -1,0 +1,12 @@
+{
+  "strategy": "additive",
+  "featureFilters": {
+    "conversion_mappings": "include",
+    "cnvalias": "include",
+    "normalization": "include",
+    "uconv": "include",
+    "ucase": "include",
+    "uprops": "include",
+    "pnames": "include"
+  }
+}
