@@ -1,0 +1,148 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 2f095ee..5983730 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1396,6 +1396,7 @@ elseif(PLAYER_CONSOLE_PORT AND NOT PLAYER_TARGET_PLATFORM STREQUAL "libretro")
+ 	elseif(PS4)
+ 
+ 		add_executable(easyrpg-player "src/platform/ps4/main.cpp")
++		target_compile_definitions(easyrpg-player PRIVATE EASYRPG_PS4_DEBUG=1)
+ 		target_link_libraries(easyrpg-player ${PROJECT_NAME}
+ 			bz2 SceSysmodule ScePigletv2VSH SceUserService SceAudioOut SceSystemService ScePad)
+ 
+diff --git a/src/font.cpp b/src/font.cpp
+index b6efb0d..f8beb5a 100644
+--- a/src/font.cpp
++++ b/src/font.cpp
+@@ -28,11 +28,7 @@
+ #include "main_data.h"
+ 
+ #ifdef HAVE_FREETYPE
+-#ifndef __PS4__
+ #  include <ft2build.h>
+-#else
+-#  include <proto-include.h>
+-#endif
+ #  include FT_FREETYPE_H
+ #  include FT_BITMAP_H
+ #  include FT_MODULE_H
+diff --git a/src/input_buttons_desktop.cpp b/src/input_buttons_desktop.cpp
+index 7e03e4f..6f2e6ea 100644
+--- a/src/input_buttons_desktop.cpp
++++ b/src/input_buttons_desktop.cpp
+@@ -128,8 +128,15 @@ Input::ButtonMappingArray Input::GetDefaultButtonMappings() {
+ 		{MINUS, Keys::JOY_REAR_RIGHT_2},
+ 		{DEBUG_ABORT_EVENT, Keys::JOY_SHOULDER_LEFT},
+ 		{TOGGLE_FPS, Keys::JOY_SHOULDER_RIGHT},
++#if defined(__PS4__)
++		// DualShock 4 on PS4: SDL "back" is OPTIONS, SDL "start" is the touchpad click.
++		// Both open the settings menu; no reset-to-title button so it can't be hit by accident.
++		{SETTINGS_MENU, Keys::JOY_START},
++		{SETTINGS_MENU, Keys::JOY_BACK},
++#else
+ 		{SETTINGS_MENU, Keys::JOY_START},
+ 		{RESET, Keys::JOY_BACK},
++#endif
+ 
+ #if USE_SDL==1
+ 		// Arbitrary: Remap this when porting to a embedded platform with SDL1
+diff --git a/src/platform/ps4/main.cpp b/src/platform/ps4/main.cpp
+index 4cab953..3618e55 100644
+--- a/src/platform/ps4/main.cpp
++++ b/src/platform/ps4/main.cpp
+@@ -3,15 +3,19 @@
+ #include "player.h"
+ #include "output.h"
+ 
++#ifdef EASYRPG_PS4_DEBUG
++#  include "ps4_notify.h"
++#endif
++
+ static char log_buffer[1024];
+ static const size_t log_buffer_size = sizeof(log_buffer)/sizeof(log_buffer[0]);
+ 
+ static void log(LogLevel lvl, std::string const& message, LogCallbackUserData userdata)
+ {
+ 	(void)userdata;
+-	
+-#ifdef NDEBUG
+-	if( (LogLevel::Debug == lvl) || (LogLevel::Info == lvl) ) 
++
++#if defined(NDEBUG) && !defined(EASYRPG_PS4_DEBUG)
++	if( (LogLevel::Debug == lvl) || (LogLevel::Info == lvl) )
+ 	{
+ 		/* Disable debug and info messages in release */
+ 		return;
+@@ -20,22 +24,41 @@ static void log(LogLevel lvl, std::string const& message, LogCallbackUserData us
+ 
+ 	snprintf(log_buffer, log_buffer_size, "<EasyRPGPlayer> %s\n", message.c_str());
+ 	sceKernelDebugOutText(0, log_buffer);
++
++#ifdef EASYRPG_PS4_DEBUG
++	if (LogLevel::Error == lvl) {
++		snprintf(log_buffer, log_buffer_size, "EasyRPG ERROR: %s", message.c_str());
++		ps4_notify(log_buffer);
++	}
++#endif
+ }
++
+ int main(int argc, char* argv[])
+ {
++#ifdef EASYRPG_PS4_DEBUG
++	ps4_notify("EasyRPG 1/3: main() reached");
++#endif
+ 	std::vector<std::string> args(argv, argv + argc);
+ 
+ 	args.push_back("--project-path");
+ 	args.push_back("/data/easyrpg-player");
+ 
+ 	Output::SetLogCallback(log, nullptr);
+-	
++
+ 	Player::Init(std::move(args));
+-	
++
++#ifdef EASYRPG_PS4_DEBUG
++	ps4_notify("EasyRPG 2/3: Player::Init done, starting main loop");
++#endif
++
+ 	Player::Run();
+-	
++
++#ifdef EASYRPG_PS4_DEBUG
++	ps4_notify("EasyRPG 3/3: exited normally");
++#endif
++
+ 	/* Prevent application from crashing */
+ 	sceSystemServiceLoadExec("EXIT", NULL);
+-	
++
+ 	return Player::exit_code;
+ }
+diff --git a/src/platform/ps4/ps4_notify.h b/src/platform/ps4/ps4_notify.h
+new file mode 100644
+index 0000000..a02e7af
+--- /dev/null
++++ b/src/platform/ps4/ps4_notify.h
+@@ -0,0 +1,21 @@
++// Tiny PS4 debug helpers: on-screen notification + klog line.
++#pragma once
++#include <string.h>
++#include <stdio.h>
++#include <orbis/libkernel.h>
++
++static inline void ps4_klog(const char* msg) {
++	char buf[1100];
++	snprintf(buf, sizeof(buf), "<ERPG-DBG> %s\n", msg);
++	sceKernelDebugOutText(0, buf);
++}
++
++static inline void ps4_notify(const char* msg) {
++	ps4_klog(msg);
++	OrbisNotificationRequest req;
++	memset(&req, 0, sizeof(req));
++	req.type = NotificationRequest;
++	req.targetId = -1;
++	strncpy(req.message, msg, sizeof(req.message) - 1);
++	sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
++}

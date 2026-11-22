@@ -1,0 +1,29 @@
+diff --git a/arch/ps4/bits/alltypes.h.in b/arch/ps4/bits/alltypes.h.in
+index 2e4b49cc..a70371fd 100644
+--- a/arch/ps4/bits/alltypes.h.in
++++ b/arch/ps4/bits/alltypes.h.in
+@@ -26,3 +26,11 @@ TYPEDEF unsigned int blksize_t;
+ TYPEDEF struct __sigset_t { unsigned int __bits[4]; } sigset_t;
+ 
+ TYPEDEF struct { long long __ll; long double __ld; } max_align_t;
++
++/* PS4: pthreads come from Sony's libkernel (FreeBSD ABI), where these are
++   pointer-sized or larger. musl's 4-byte defaults get overrun by libkernel. */
++TYPEDEF struct { void *__attr; } pthread_mutexattr_t;
++TYPEDEF struct { void *__attr; } pthread_condattr_t;
++TYPEDEF struct { void *__attr; } pthread_barrierattr_t;
++TYPEDEF long pthread_spinlock_t;
++TYPEDEF struct { int __state; void *__mutex; } pthread_once_t;
+diff --git a/include/pthread.h b/include/pthread.h
+index 43d23d36..01368137 100644
+--- a/include/pthread.h
++++ b/include/pthread.h
+@@ -58,7 +58,7 @@ extern "C" {
+ #define PTHREAD_MUTEX_INITIALIZER {{{0}}}
+ #define PTHREAD_RWLOCK_INITIALIZER {{{0}}}
+ #define PTHREAD_COND_INITIALIZER {{{0}}}
+-#define PTHREAD_ONCE_INIT 0
++#define PTHREAD_ONCE_INIT { 0, 0 } /* PS4: libkernel pthread_once_t is a struct */
+ 
+ 
+ #define PTHREAD_CANCEL_ENABLE 0
